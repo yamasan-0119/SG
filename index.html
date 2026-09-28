@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CYBER RUSH 3D - ハイパースピードシューター</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #060919;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    /* UI Overlay */
+    #ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(10px, 3vw, 24px);
+    }
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      width: 100%;
+    }
+    .hud-box {
+      background: rgba(4, 10, 24, 0.85);
+      border: 2px solid rgba(0, 240, 255, 0.8);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.3), inset 0 0 10px rgba(0, 240, 255, 0.15);
+      padding: clamp(8px, 1.5vw, 12px) clamp(12px, 2vw, 20px);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+    }
+    .score-title, .speed-title, .shield-title, .boost-title, .ammo-title {
+      font-size: clamp(10px, 2.2vw, 13px);
+      font-weight: 800;
+      color: #00f0ff;
+      letter-spacing: 1.5px;
+      margin-bottom: 2px;
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+    }
+    .score-value {
+      font-size: clamp(20px, 4vw, 32px);
+      font-weight: 900;
+      color: #ffffff;
+      text-shadow: 0 0 12px #00f0ff;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .speed-value {
+      font-size: clamp(20px, 4vw, 32px);
+      font-weight: 900;
+      color: #ff3377;
+      text-shadow: 0 0 12px #ff3377;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .ammo-value {
+      font-size: clamp(14px, 2.5vw, 20px);
+      font-weight: 800;
+      color: #00ffaa;
+      text-shadow: 0 0 10px #00ffaa;
+      font-family: 'Courier New', Courier, monospace;
+      display: inline-block;
+      margin-left: 6px;
+    }
+    /* Shield / Gauge Bars */
+    .gauge-bar-bg {
+      width: clamp(140px, 30vw, 220px);
+      height: clamp(8px, 1.8vw, 12px);
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 240, 255, 0.8);
+      margin-top: 3px;
+    }
+    .shield-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #00f0ff, #00ffaa);
+      transition: width 0.2s ease-out;
+      box-shadow: 0 0 10px #00f0ff;
+    }
+    .boost-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff0055, #ffcc00);
+      transition: width 0.1s linear;
+      box-shadow: 0 0 10px #ffaa00;
+    }
+    .ammo-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #00ffaa, #00f0ff);
+      transition: width 0.1s linear;
+      box-shadow: 0 0 10px #00ffaa;
+    }
+    /* Mobile Touch Controls */
+    #touch-controls {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 15;
+      pointer-events: none;
+      display: none;
+    }
+    .touch-active #touch-controls {
+      display: block;
+    }
+    /* Mobile Action Buttons */
+    .action-buttons {
+      position: absolute;
+      bottom: 25px;
+      right: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-end;
+      pointer-events: auto;
+    }
+    .touch-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 2px solid rgba(0, 240, 255, 0.8);
+      background: rgba(4, 10, 24, 0.8);
+      color: #00f0ff;
+      font-size: 11px;
+      font-weight: 900;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+      backdrop-filter: blur(5px);
+      touch-action: none;
+    }
+    .touch-btn:active, .touch-btn.active {
+      background: rgba(0, 240, 255, 0.4);
+      color: #ffffff;
+      transform: scale(0.92);
+    }
+    #touch-fire-btn.active {
+      background: rgba(0, 255, 170, 0.5);
+      border-color: #00ffaa;
+      box-shadow: 0 0 20px #00ffaa;
+    }
+    #touch-boost-btn.active {
+      background: rgba(255, 0, 85, 0.5);
+      border-color: #ff0055;
+      box-shadow: 0 0 20px #ff0055;
+    }
+    /* States */
+    .overheat-text { color: #ff0055 !important; animation: blink 0.35s infinite alternate; }
+    .overheat-bar { background: #ff0033 !important; animation: blink 0.35s infinite alternate; }
+    .reload-text { color: #ffaa00 !important; animation: blink 0.35s infinite alternate; }
+    .reload-bar { background: #ffaa00 !important; }
+    /* Boss HUD Styles */
+    #boss-hud {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(85%, 480px);
+      background: rgba(20, 4, 12, 0.88);
+      border: 2px solid #ff0055;
+      box-shadow: 0 0 25px rgba(255, 0, 85, 0.6), inset 0 0 15px rgba(255, 0, 85, 0.3);
+      padding: 10px 18px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      text-align: center;
+      pointer-events: none;
+      transition: all 0.4s ease-in-out;
+    }
+    .boss-name {
+      font-size: clamp(11px, 2.3vw, 15px);
+      font-weight: 900;
+      color: #ff0055;
+      letter-spacing: 3px;
+      text-shadow: 0 0 10px #ff0055;
+      margin-bottom: 5px;
+      animation: blink 0.6s infinite alternate;
+    }
+    .boss-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #ff0055;
+    }
+    .boss-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff0055, #ff6600, #ffcc00);
+      transition: width 0.15s ease-out;
+      box-shadow: 0 0 15px #ff0055;
+    }
+    @keyframes blink {
+      0% { opacity: 0.3; }
+      100% { opacity: 1.0; }
+    }
+    /* Start / GameOver Screen */
+    .screen-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(4, 7, 22, 0.92);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 30;
+      pointer-events: auto;
+      backdrop-filter: blur(12px);
+      padding: 20px;
+    }
+    .title {
+      font-size: clamp(32px, 7vw, 56px);
+      font-weight: 900;
+      letter-spacing: clamp(3px, 1vw, 8px);
+      background: linear-gradient(45deg, #00f0ff, #ff3377, #ffcc00);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+      text-shadow: 0 0 35px rgba(0, 240, 255, 0.7);
+      text-align: center;
+    }
+    .subtitle {
+      font-size: clamp(13px, 3vw, 18px);
+      color: #d0e0ff;
+      margin-bottom: 24px;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+    .btn {
+      background: linear-gradient(45deg, #00f0ff, #0066ff);
+      border: none;
+      color: #fff;
+      padding: clamp(12px, 2.5vw, 16px) clamp(32px, 5vw, 48px);
+      font-size: clamp(15px, 3vw, 19px);
+      font-weight: 800;
+      letter-spacing: 2px;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.8);
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      transform: scale(1.05);
+    }
+    .controls-info {
+      margin-top: 24px;
+      background: rgba(10, 20, 45, 0.7);
+      padding: clamp(12px, 3vw, 20px) clamp(16px, 4vw, 32px);
+      border-radius: 12px;
+      border: 1.5px solid rgba(0, 240, 255, 0.4);
+      font-size: clamp(11px, 2.2vw, 14px);
+      line-height: 1.8;
+      color: #eeeeff;
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+    .hidden {
+      display: none !important;
+    }
+    /* Dynamic Crosshair */
+    #crosshair {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      height: 28px;
+      border: 2px solid #00f0ff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 5;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 15px #00f0ff, inset 0 0 8px #00f0ff;
+      transition: opacity 0.2s ease;
+    }
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #ffffff;
+    }
+    /* ガチャ用スタイル */
+    .coin-display {
+      font-size: clamp(16px, 3.5vw, 24px);
+      color: #ffcc00;
+      font-weight: 900;
+      margin-bottom: 20px;
+      text-shadow: 0 0 15px #ffcc00;
+      letter-spacing: 2px;
+    }
+    .gacha-btn {
+      background: linear-gradient(45deg, #ffaa00, #ff0055);
+      margin-top: 12px;
+      box-shadow: 0 0 25px rgba(255, 170, 0, 0.6);
+    }
+    .skin-btn {
+      background: linear-gradient(45deg, #335577, #00f0ff);
+      margin-top: 12px;
+      font-size: clamp(12px, 2.5vw, 15px);
+      padding: 10px 24px;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+    }
+    .gacha-result {
+      font-size: clamp(24px, 6vw, 42px);
+      font-weight: 900;
+      margin: 20px 0;
+      letter-spacing: 4px;
+      animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0); opacity: 0; }
+      80% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .rarity-NORMAL { color: #00f0ff; text-shadow: 0 0 15px #00f0ff; }
+    .rarity-RARE { color: #00ffaa; text-shadow: 0 0 15px #00ffaa; }
+    .rarity-EPIC { color: #aa00ff; text-shadow: 0 0 15px #aa00ff; }
+    .rarity-LEGENDARY { color: #ffcc00; text-shadow: 0 0 15px #ffcc00; }
+
+    /* ハンガー（機体一覧）＆ステータス可視化用スタイル */
+    .hangar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 14px;
+      width: 100%;
+      max-width: 960px;
+      max-height: 60vh;
+      overflow-y: auto;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 5, 20, 0.75);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    .hangar-grid::-webkit-scrollbar {
+      width: 8px;
+    }
+    .hangar-grid::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.5);
+      border-radius: 4px;
+    }
+    .hangar-card {
+      background: rgba(10, 20, 42, 0.88);
+      border: 2px solid rgba(0, 240, 255, 0.3);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+    .hangar-card.equipped {
+      border-color: #00ffaa;
+      box-shadow: 0 0 15px rgba(0, 255, 170, 0.4);
+      background: rgba(10, 40, 55, 0.9);
+    }
+    .hangar-card.locked {
+      opacity: 0.5;
+      filter: grayscale(0.6);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .card-name {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+    .stats-container {
+      margin: 6px 0;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px;
+      border-radius: 6px;
+    }
+    .stat-row {
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      margin-bottom: 3px;
+      color: #d0e0ff;
+    }
+    .stat-label {
+      width: 72px;
+      font-weight: 800;
+    }
+    .stat-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 6px;
+    }
+    .stat-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00f0ff, #00ffaa);
+      border-radius: 3px;
+    }
+    .stat-val {
+      width: 36px;
+      text-align: right;
+      font-family: monospace;
+      font-weight: 900;
+      font-size: 11px;
+      color: #ffffff;
+    }
+    .equip-btn {
+      margin-top: 8px;
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 900;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.15s ease;
+      width: 100%;
+    }
+    .equip-btn.active-equip {
+      background: #00ffaa;
+      color: #000;
+      box-shadow: 0 0 10px rgba(0, 255, 170, 0.5);
+    }
+    .equip-btn.select-equip {
+      background: linear-gradient(45deg, #00f0ff, #0066ff);
+      color: #fff;
+    }
+    .equip-btn.select-equip:hover {
+      transform: scale(1.02);
+    }
+    .equip-btn.disabled-equip {
+      background: rgba(60, 60, 60, 0.6);
+      color: #888;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="crosshair"></div>
+  <!-- HUD -->
+  <div id="ui-container">
+    <div class="hud-top">
+      <div class="hud-box">
+        <div class="score-title">SCORE</div>
+        <div class="score-value" id="score-text">000000</div>
+      </div>
+      <!-- Boss Health Overlay -->
+      <div id="boss-hud" class="hidden">
+        <div class="boss-name">⚠️ WARNING: CYBER DREADNOUGHT ⚠️</div>
+        <div class="boss-bar-bg">
+          <div class="boss-bar" id="boss-bar"></div>
+        </div>
+      </div>
+      <div class="hud-box" style="text-align: right;">
+        <div class="speed-title">SPEED</div>
+        <div class="speed-value" id="speed-text">300 KM/H</div>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div class="hud-box" style="display: inline-block;">
+        <div class="shield-title">SHIELD</div>
+        <div class="gauge-bar-bg"><div class="shield-bar" id="shield-bar"></div></div>
+        
+        <div class="boost-title" id="boost-label" style="margin-top: 8px;">BOOST [SHIFT]</div>
+        <div class="gauge-bar-bg"><div class="boost-bar" id="boost-bar"></div></div>
+        
+        <div class="ammo-title" id="ammo-label" style="margin-top: 8px;">
+          AMMO <span class="ammo-value" id="ammo-text">40 / 40</span>
+        </div>
+        <div class="gauge-bar-bg"><div class="ammo-bar" id="ammo-bar"></div></div>
+      </div>
+    </div>
+  </div>
+  <!-- タッチ端末用バーチャルUI -->
+  <div id="touch-controls">
+    <div class="action-buttons">
+      <div class="touch-btn" id="touch-fire-btn">FIRE</div>
+      <div class="touch-btn" id="touch-boost-btn">BOOST</div>
+      <div class="touch-btn" id="touch-reload-btn">RELOAD</div>
+    </div>
+  </div>
+  <!-- タイトル画面 -->
+  <div id="start-screen" class="screen-overlay">
+    <div class="title">CYBER RUSH 3D</div>
+    <div class="subtitle">超高速サイバーシューティング</div>
+    <div class="coin-display" id="title-coins">COINS: 0</div>
+    <button class="btn" id="start-btn">GAME START</button>
+    <button class="btn gacha-btn" id="open-gacha-btn">GACHA (1000 COINS)</button>
+    <button class="btn skin-btn" id="open-hangar-btn">GARAGE / HANGAR</button>
+    <div class="controls-info">
+      <strong>【操作方法】</strong><br>
+      PC: [W][A][S][D] / マウス移動<br>
+      攻撃: 左クリック長押し / [Space] | リロード: [R]<br>
+      ブースト: [Shift] キー<br>
+      <span style="color: #00f0ff;">スマホ/タブレット: 画面スライドで移動＆右下「FIRE」長押しで射撃</span>
+    </div>
+  </div>
+
+  <!-- 機体格納庫（ハンガー）画面 -->
+  <div id="hangar-screen" class="screen-overlay hidden" style="justify-content: flex-start; padding-top: 25px;">
+    <div class="title" style="font-size: clamp(22px, 4.5vw, 36px); margin-bottom: 5px;">ARMOR HANGAR</div>
+    <div class="coin-display" id="hangar-coins" style="font-size: 15px; margin-bottom: 12px;">COINS: 0</div>
+    
+    <div id="hangar-grid" class="hangar-grid">
+      <!-- JavaScriptで動的生成 -->
+    </div>
+    
+    <button class="btn skin-btn" id="close-hangar-btn" style="margin-top: 15px; margin-bottom: 15px;">BACK TO MENU</button>
+  </div>
+  
+  <!-- ゲームオーバー画面 -->
+  <div id="gameover-screen" class="screen-overlay hidden">
+    <div class="title" style="background: linear-gradient(45deg, #ff0055, #ffaa00); -webkit-background-clip: text;">SYSTEM CRASHED</div>
+    <div class="subtitle" id="final-score" style="margin-bottom: 8px;">FINAL SCORE: 0</div>
+    <div class="coin-display" id="earned-coins" style="margin-bottom: 24px; font-size: 20px; color: #00ffaa; text-shadow: 0 0 10px #00ffaa;">EARNED COINS: +0</div>
+    <button class="btn" id="restart-btn">RETRY</button>
+    <button class="btn skin-btn" id="to-title-btn" style="margin-top: 15px;">TITLE MENU</button>
+  </div>
+  
+  <!-- ガチャ画面 -->
+  <div id="gacha-screen" class="screen-overlay hidden">
+    <div class="title" style="font-size: clamp(24px, 5vw, 40px); margin-bottom: 15px;">SKIN DECRYPTION</div>
+    <div class="coin-display" id="gacha-coins">COINS: 0</div>
+    
+    <div id="gacha-result-area" class="hidden" style="text-align: center; width: 100%; max-width: 380px; margin: 10px 0;">
+      <div style="font-size: clamp(12px, 3vw, 15px); color: #fff; letter-spacing: 2px;">NEW ARMOR UNLOCKED!</div>
+      <div id="gacha-result-name" class="gacha-result rarity-NORMAL" style="margin: 8px 0;">DEFAULT</div>
+      <div id="gacha-result-stats" class="stats-container" style="text-align: left;"></div>
+    </div>
+    <div id="gacha-placeholder" style="height: 180px;"></div>
+    
+    <button class="btn gacha-btn" id="roll-gacha-btn">ROLL (1000 COINS)</button>
+    <button class="btn skin-btn" id="close-gacha-btn" style="margin-top: 20px;">BACK TO MENU</button>
+  </div>
+
+  <script>
+    // --- 音声効果 (Web Audio API) ---
+    class SoundController {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playLaser() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(850, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.15);
+      }
+      playReload() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+      }
+      playExplosion(isBig = false) {
+        if (!this.ctx) return;
+        const duration = isBig ? 0.6 : 0.3;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(isBig ? 220 : 150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + duration);
+        gain.gain.setValueAtTime(isBig ? 0.6 : 0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+      }
+      playHit() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(45, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+      }
+    }
+    const sound = new SoundController();
+
+    // --- メインゲーム変数 ---
+    let scene, camera, renderer;
+    let player, playerTargetPos = { x: 0, y: 0 };
+    let stars, starGeo;
+    let tunnelRings = [];
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    let explosions = [];
+    let crosshairElement;
+    
+    let boss = null;
+    let bossBullets = [];
+    let bossHp = 100;
+    let maxBossHp = 100;
+    let isBossActive = false;
+    let nextBossScore = 1500;
+    let bossShootTimer = 0;
+    let gameState = 'TITLE'; // TITLE, PLAYING, GAMEOVER, GACHA
+    let score = 0;
+    let shield = 100;
+    
+    // --- ガチャ・スキン関連変数 ---
+    const GACHA_COST = 1000;
+    let totalCoins = 0;
+    let unlockedSkins = ['DEFAULT'];
+    let currentSkin = 'DEFAULT';
+    let currentBulletSpeed = 4.0;
+    
+    const SKINS = {
+      'DEFAULT': { name: 'TYPE-B (DEFAULT)', color: 0x00f0ff, bodyColor: 0x335577, rarity: 'NORMAL', stats: { shield: 100, speed: 2.5, fireRate: 0.12, ammo: 40, boost: 200, bulletSpeed: 4.0 } },
+      'NEON': { name: 'NEON VIPER', color: 0x00ffaa, bodyColor: 0x225533, rarity: 'RARE', stats: { shield: 70, speed: 3.1, fireRate: 0.10, ammo: 30, boost: 250, bulletSpeed: 5.5 } },
+      'CRIMSON': { name: 'CRIMSON BIRD', color: 0xff0055, bodyColor: 0x551122, rarity: 'RARE', stats: { shield: 130, speed: 2.2, fireRate: 0.14, ammo: 60, boost: 160, bulletSpeed: 3.5 } },
+      'PURPLE': { name: 'VOID RUNNER', color: 0xaa00ff, bodyColor: 0x331155, rarity: 'EPIC', stats: { shield: 90, speed: 2.8, fireRate: 0.11, ammo: 45, boost: 300, bulletSpeed: 6.0 } },
+      'PHANTOM': { name: 'PHANTOM STEALTH', color: 0x00ffdd, bodyColor: 0x112233, rarity: 'RARE', stats: { shield: 80, speed: 3.2, fireRate: 0.11, ammo: 35, boost: 220, bulletSpeed: 6.8 } },
+      'TITAN': { name: 'TITAN FORTRESS', color: 0xff6600, bodyColor: 0x442200, rarity: 'RARE', stats: { shield: 200, speed: 1.8, fireRate: 0.15, ammo: 90, boost: 180, bulletSpeed: 3.2 } },
+      'VALKYRIE': { name: 'VALKYRIE PRIME', color: 0x33ffff, bodyColor: 0x224466, rarity: 'EPIC', stats: { shield: 110, speed: 2.9, fireRate: 0.09, ammo: 55, boost: 260, bulletSpeed: 6.2 } },
+      'SOLAR': { name: 'SOLAR FLARE', color: 0xff8800, bodyColor: 0x552200, rarity: 'EPIC', stats: { shield: 100, speed: 3.1, fireRate: 0.08, ammo: 50, boost: 280, bulletSpeed: 7.0 } },
+      'PLASMA': { name: 'PLASMA STORM', color: 0xcc00ff, bodyColor: 0x330055, rarity: 'RARE', stats: { shield: 85, speed: 2.6, fireRate: 0.07, ammo: 70, boost: 210, bulletSpeed: 5.8 } },
+      'GOLDEN': { name: 'GOLDEN EMPEROR', color: 0xffcc00, bodyColor: 0x554400, rarity: 'LEGENDARY', stats: { shield: 150, speed: 2.7, fireRate: 0.09, ammo: 80, boost: 250, bulletSpeed: 5.2 } },
+      'DARKNESS': { name: 'DARK MATTER', color: 0xff0000, bodyColor: 0x111111, rarity: 'LEGENDARY', stats: { shield: 50, speed: 3.4, fireRate: 0.05, ammo: 100, boost: 120, bulletSpeed: 8.0 } },
+      'CHRONO': { name: 'CHRONO SHIFT', color: 0x00ff88, bodyColor: 0x004422, rarity: 'LEGENDARY', stats: { shield: 140, speed: 3.3, fireRate: 0.06, ammo: 85, boost: 320, bulletSpeed: 7.5 } }
+    };
+
+    // ブースト（スタミナ）関連
+    let maxBoost = 200;
+    let boostAmount = maxBoost;
+    let canBoost = true;
+    let isBoosting = false;
+    // 弾数・連射・リロード関連
+    let maxAmmo = 40;
+    let currentAmmo = maxAmmo;
+    let isReloading = false;
+    let reloadTimer = 0;
+    const RELOAD_TIME = 2.0;
+    let lastShootTime = 0;
+    let shootInterval = 0.12;
+    let isMouseDown = false;
+    let isTouchFiring = false;
+    let baseSpeed = 2.5;
+    let currentSpeed = baseSpeed;
+    let targetFov = 75;
+    let cameraShake = 0;
+    let maxShield = 100;
+    // キー＆タッチ入力状態
+    const keys = { w: false, a: false, s: false, d: false, space: false, shift: false, r: false };
+    let mousePos = { x: 0, y: 0 };
+    let touchMoveActive = false;
+
+    // --- 初期化 ---
+    function init() {
+      loadData();
+      const container = document.getElementById('canvas-container');
+      crosshairElement = document.getElementById('crosshair');
+      // スマホ・タブレット等のタッチ端末判定
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.body.classList.add('touch-active');
+      }
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x060919);
+      scene.fog = new THREE.FogExp2(0x060919, 0.006);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 5);
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0x00f0ff, 1.8);
+      dirLight.position.set(5, 12, 10);
+      scene.add(dirLight);
+      const pointLight = new THREE.PointLight(0xff0066, 2.8, 70);
+      pointLight.position.set(0, 0, -5);
+      scene.add(pointLight);
+      
+      createPlayer();
+      createStarfield();
+      createTunnelRings();
+      
+      // イベントリスナー設定
+      window.addEventListener('resize', onWindowResize);
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mousedown', onMouseDown);
+      window.addEventListener('mouseup', onMouseUp);
+      window.addEventListener('keydown', (e) => handleKey(e, true));
+      window.addEventListener('keyup', (e) => handleKey(e, false));
+      setupTouchControls();
+      setupGachaControls();
+      
+      document.getElementById('start-btn').addEventListener('click', startGame);
+      document.getElementById('restart-btn').addEventListener('click', startGame);
+      
+      document.getElementById('to-title-btn').addEventListener('click', () => {
+        document.getElementById('gameover-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('hidden');
+        updateTitleUI();
+        createPlayer();
+        gameState = 'TITLE';
+      });
+      
+      setupHangarControls();
+      updateTitleUI();
+      animate();
+    }
+
+    // --- ステータスバー可視化HTML生成 ---
+    function renderSkinStatsHTML(stats) {
+      const shieldPct = Math.min(100, (stats.shield / 200) * 100);
+      const speedPct = Math.min(100, (stats.speed / 3.5) * 100);
+      // 連射速度は値が小さいほど速い（0.05s〜0.16s）
+      const fireRatePct = Math.min(100, Math.max(10, ((0.18 - stats.fireRate) / 0.13) * 100));
+      const ammoPct = Math.min(100, (stats.ammo / 100) * 100);
+      const boostPct = Math.min(100, (stats.boost / 320) * 100);
+      const bulletSpeedPct = Math.min(100, (stats.bulletSpeed / 8.0) * 100);
+
+      return `
+        <div class="stat-row"><span class="stat-label">🛡️ シールド</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${shieldPct}%"></div></div><span class="stat-val">${stats.shield}</span></div>
+        <div class="stat-row"><span class="stat-label">⚡ 移動速度</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${speedPct}%"></div></div><span class="stat-val">${stats.speed.toFixed(1)}</span></div>
+        <div class="stat-row"><span class="stat-label">🔥 連射速度</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${fireRatePct}%"></div></div><span class="stat-val">${stats.fireRate}s</span></div>
+        <div class="stat-row"><span class="stat-label">🔫 最大弾数</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${ammoPct}%"></div></div><span class="stat-val">${stats.ammo}</span></div>
+        <div class="stat-row"><span class="stat-label">🚀 ブースト</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${boostPct}%"></div></div><span class="stat-val">${stats.boost}</span></div>
+        <div class="stat-row"><span class="stat-label">💨 弾速</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${bulletSpeedPct}%"></div></div><span class="stat-val">${stats.bulletSpeed.toFixed(1)}</span></div>
+      `;
+    }
+
+    // --- 機体一覧（ハンガー）描画 ---
+    function renderHangar() {
+      const grid = document.getElementById('hangar-grid');
+      document.getElementById('hangar-coins').innerText = `COINS: ${totalCoins}`;
+      grid.innerHTML = '';
+
+      Object.keys(SKINS).forEach(key => {
+        const skin = SKINS[key];
+        const isUnlocked = unlockedSkins.includes(key);
+        const isEquipped = currentSkin === key;
+
+        const card = document.createElement('div');
+        card.className = `hangar-card ${isEquipped ? 'equipped' : ''} ${!isUnlocked ? 'locked' : ''}`;
+
+        let btnClass = 'equip-btn ';
+        let btnText = 'SELECT';
+        if (isEquipped) {
+          btnClass += 'active-equip';
+          btnText = 'EQUIPPED';
+        } else if (isUnlocked) {
+          btnClass += 'select-equip';
+          btnText = 'EQUIP';
+        } else {
+          btnClass += 'disabled-equip';
+          btnText = 'LOCKED (GACHA)';
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="card-header">
+              <span class="card-name rarity-${skin.rarity}">${skin.name}</span>
+              <span class="rarity-${skin.rarity}" style="font-size: 10px; font-weight: 900;">[${skin.rarity}]</span>
+            </div>
+            <div class="stats-container">
+              ${renderSkinStatsHTML(skin.stats)}
+            </div>
+          </div>
+          <button class="${btnClass}" ${!isUnlocked || isEquipped ? 'disabled' : ''} data-skin="${key}">
+            ${btnText}
+          </button>
+        `;
+
+        const btn = card.querySelector('button');
+        if (isUnlocked && !isEquipped) {
+          btn.addEventListener('click', () => {
+            currentSkin = key;
+            saveData();
+            updateTitleUI();
+            createPlayer();
+            renderHangar();
+          });
+        }
+
+        grid.appendChild(card);
+      });
+    }
+
+    function setupHangarControls() {
+      document.getElementById('open-hangar-btn').addEventListener('click', () => {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('hangar-screen').classList.remove('hidden');
+        renderHangar();
+      });
+
+      document.getElementById('close-hangar-btn').addEventListener('click', () => {
+        document.getElementById('hangar-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('hidden');
+        updateTitleUI();
+        createPlayer();
+      });
+    }
+
+    // --- セーブデータ管理 ---
+    function loadData() {
+      const saved = localStorage.getItem('cyberRushData');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          totalCoins = data.totalCoins || 0;
+          unlockedSkins = data.unlockedSkins || ['DEFAULT'];
+          currentSkin = data.currentSkin || 'DEFAULT';
+        } catch (e) {
+          console.error('Save data corrupted');
+        }
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem('cyberRushData', JSON.stringify({
+        totalCoins, unlockedSkins, currentSkin
+      }));
+    }
+
+    function updateTitleUI() {
+      document.getElementById('title-coins').innerText = `COINS: ${totalCoins}`;
+      document.getElementById('open-hangar-btn').innerText = `GARAGE [EQUIPPED: ${SKINS[currentSkin].name}]`;
+      
+      const gachaBtn = document.getElementById('open-gacha-btn');
+      if (unlockedSkins.length >= Object.keys(SKINS).length) {
+        gachaBtn.innerText = "ALL SKINS UNLOCKED";
+        gachaBtn.disabled = true;
+        gachaBtn.style.opacity = '0.5';
+      } else {
+        gachaBtn.innerText = `GACHA (${GACHA_COST} COINS)`;
+        gachaBtn.disabled = totalCoins < GACHA_COST;
+        gachaBtn.style.opacity = totalCoins < GACHA_COST ? '0.5' : '1.0';
+      }
+    }
+
+    // --- ガチャUI制御 ---
+    function setupGachaControls() {
+      document.getElementById('open-gacha-btn').addEventListener('click', () => {
+        if (totalCoins >= GACHA_COST && unlockedSkins.length < Object.keys(SKINS).length) {
+          document.getElementById('start-screen').classList.add('hidden');
+          document.getElementById('gacha-screen').classList.remove('hidden');
+          document.getElementById('gacha-coins').innerText = `COINS: ${totalCoins}`;
+          document.getElementById('gacha-result-area').classList.add('hidden');
+          document.getElementById('gacha-placeholder').classList.remove('hidden');
+        }
+      });
+      
+      document.getElementById('close-gacha-btn').addEventListener('click', () => {
+        document.getElementById('gacha-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('hidden');
+        updateTitleUI();
+        createPlayer();
+      });
+      
+      document.getElementById('roll-gacha-btn').addEventListener('click', () => {
+        if (totalCoins < GACHA_COST) return;
+        const available = Object.keys(SKINS).filter(k => !unlockedSkins.includes(k));
+        if (available.length === 0) return;
+        
+        totalCoins -= GACHA_COST;
+        sound.playHit(); 
+        
+        const newSkinKey = available[Math.floor(Math.random() * available.length)];
+        unlockedSkins.push(newSkinKey);
+        currentSkin = newSkinKey; // 即座に装備
+        saveData();
+        
+        document.getElementById('gacha-coins').innerText = `COINS: ${totalCoins}`;
+        
+        const resultArea = document.getElementById('gacha-result-area');
+        const placeholder = document.getElementById('gacha-placeholder');
+        const resultName = document.getElementById('gacha-result-name');
+        const resultStats = document.getElementById('gacha-result-stats');
+        const skinData = SKINS[newSkinKey];
+        
+        resultName.innerText = skinData.name;
+        resultName.className = `gacha-result rarity-${skinData.rarity}`;
+        resultStats.innerHTML = renderSkinStatsHTML(skinData.stats);
+        
+        placeholder.classList.add('hidden');
+        resultArea.classList.remove('hidden');
+        
+        resultName.style.animation = 'none';
+        void resultName.offsetWidth; 
+        resultName.style.animation = 'popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+        
+        const rollBtn = document.getElementById('roll-gacha-btn');
+        if (unlockedSkins.length >= Object.keys(SKINS).length) {
+          rollBtn.innerText = "ALL UNLOCKED";
+          rollBtn.disabled = true;
+          rollBtn.style.opacity = '0.5';
+        } else {
+          rollBtn.disabled = totalCoins < GACHA_COST;
+          rollBtn.style.opacity = totalCoins < GACHA_COST ? '0.5' : '1.0';
+        }
+      });
+    }
+
+    // --- タッチ操作（全画面スライド＆タッチボタン）のセットアップ ---
+    function setupTouchControls() {
+      window.addEventListener('touchstart', (e) => {
+        if (gameState !== 'PLAYING') return;
+        for (let i = 0; i < e.touches.length; i++) {
+          const touch = e.touches[i];
+          if (touch.clientX < window.innerWidth - 110 || touch.clientY < window.innerHeight - 250) {
+            updateTouchPosition(touch);
+            touchMoveActive = true;
+            break;
+          }
+        }
+      }, { passive: true });
+      window.addEventListener('touchmove', (e) => {
+        if (gameState !== 'PLAYING' || !touchMoveActive) return;
+        for (let i = 0; i < e.touches.length; i++) {
+          const touch = e.touches[i];
+          if (touch.clientX < window.innerWidth - 110 || touch.clientY < window.innerHeight - 250) {
+            updateTouchPosition(touch);
+            break;
+          }
+        }
+      }, { passive: true });
+      window.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+          touchMoveActive = false;
+        }
+      });
+      function updateTouchPosition(touch) {
+        mousePos.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        mousePos.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+      }
+      
+      const fireBtn = document.getElementById('touch-fire-btn');
+      fireBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isTouchFiring = true;
+        fireBtn.classList.add('active');
+      }, { passive: false });
+      
+      const stopTouchFire = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isTouchFiring = false;
+        fireBtn.classList.remove('active');
+      };
+      fireBtn.addEventListener('touchend', stopTouchFire, { passive: false });
+      fireBtn.addEventListener('touchcancel', stopTouchFire, { passive: false });
+      
+      const boostBtn = document.getElementById('touch-boost-btn');
+      boostBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        keys.shift = true;
+        boostBtn.classList.add('active');
+      }, { passive: false });
+      boostBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        keys.shift = false;
+        boostBtn.classList.remove('active');
+      }, { passive: false });
+      
+      const reloadBtn = document.getElementById('touch-reload-btn');
+      reloadBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startReload();
+      }, { passive: false });
+    }
+
+    // --- 自機作成 ---
+    function createPlayer() {
+      if (player) scene.remove(player);
+      
+      const skin = SKINS[currentSkin] || SKINS['DEFAULT'];
+      
+      player = new THREE.Group();
+      const bodyGeo = new THREE.ConeGeometry(0.65, 2.6, 5);
+      bodyGeo.rotateX(Math.PI / 2);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: skin.bodyColor,
+        roughness: 0.1,
+        metalness: 0.9,
+        wireframe: false
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      player.add(body);
+      
+      const wingGeo = new THREE.BufferGeometry();
+      const vertices = new Float32Array([
+         0.0,  0.0,  0.2,
+         2.3, -0.1,  0.8,
+         0.0,  0.0, -0.8,
+        -2.3, -0.1,  0.8
+      ]);
+      const indices = [0, 1, 2, 0, 2, 3];
+      wingGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+      wingGeo.setIndex(indices);
+      wingGeo.computeVertexNormals();
+      const wingMat = new THREE.MeshStandardMaterial({
+        color: skin.color,
+        roughness: 0.1,
+        metalness: 0.8,
+        emissive: skin.bodyColor,
+        side: THREE.DoubleSide
+      });
+      const wings = new THREE.Mesh(wingGeo, wingMat);
+      player.add(wings);
+      
+      const cockpitGeo = new THREE.SphereGeometry(0.35, 8, 8);
+      cockpitGeo.scale(1, 0.6, 2);
+      const cockpitMat = new THREE.MeshBasicMaterial({ color: 0x88ffff });
+      const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+      cockpit.position.set(0, 0.25, -0.2);
+      player.add(cockpit);
+      
+      const engineGeo = new THREE.CylinderGeometry(0.2, 0.35, 0.5, 8);
+      engineGeo.rotateX(Math.PI / 2);
+      const engineMat = new THREE.MeshBasicMaterial({ color: skin.color });
+      const engine = new THREE.Mesh(engineGeo, engineMat);
+      engine.position.z = 1.3;
+      player.add(engine);
+      
+      const glowGeo = new THREE.SphereGeometry(0.32, 8, 8);
+      const glowMat = new THREE.MeshBasicMaterial({ color: skin.color, transparent: true, opacity: 0.95 });
+      const glow = new THREE.Mesh(glowGeo, glowMat);
+      glow.position.z = 1.5;
+      glow.name = "engineGlow";
+      player.add(glow);
+      
+      player.position.set(0, 0, 0);
+      scene.add(player);
+    }
+
+    // --- 宇宙背景・スピード粒子 ---
+    function createStarfield() {
+      const count = 1200;
+      starGeo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 110;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 110;
+        positions[i * 3 + 2] = -Math.random() * 220;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const starMat = new THREE.PointsMaterial({
+        color: 0x88f0ff,
+        size: 0.65,
+        transparent: true,
+        opacity: 0.9
+      });
+      stars = new THREE.Points(starGeo, starMat);
+      scene.add(stars);
+    }
+    
+    // --- トンネルリング ---
+    function createTunnelRings() {
+      const ringGeo = new THREE.TorusGeometry(12, 0.08, 8, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e1ff, transparent: true, opacity: 0.35 });
+      for (let i = 0; i < 15; i++) {
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.z = -i * 15;
+        scene.add(ring);
+        tunnelRings.push(ring);
+      }
+    }
+    
+    // --- 予測ライン ---
+    function createPredictionLine(startX, startY, targetZ) {
+      // LineDashedMaterialの代わりに、太さを持たせたCylinderGeometryを使用して見やすい警告レーザーを作成
+      const distance = Math.abs(targetZ - 20);
+      const geometry = new THREE.CylinderGeometry(0.15, 0.15, distance, 8);
+      geometry.rotateX(Math.PI / 2); // Z軸に沿うように回転
+      
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xff1100,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending // 光る表現
+      });
+      
+      const line = new THREE.Mesh(geometry, material);
+      line.position.set(startX, startY, targetZ + distance / 2);
+      scene.add(line);
+      return line;
+    }
+
+    // --- 敵の生成 ---
+    function spawnEnemy() {
+      if (gameState !== 'PLAYING') return;
+      const type = Math.random();
+      let enemy;
+      if (type < 0.65) {
+        const geo = new THREE.OctahedronGeometry(1.3, 0);
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xff0066,
+          emissive: 0x880033,
+          roughness: 0.1,
+          metalness: 0.8
+        });
+        enemy = new THREE.Mesh(geo, mat);
+        enemy.userData = { type: 'STANDARD', hp: 2, rotSpeed: 0.035, scoreValue: 100, hitRadius: 2.8 };
+      } else {
+        const geo = new THREE.DodecahedronGeometry(1.9, 0);
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xffbb00,
+          emissive: 0x884400,
+          roughness: 0.1,
+          metalness: 0.9,
+          wireframe: true
+        });
+        enemy = new THREE.Mesh(geo, mat);
+        enemy.userData = { type: 'HARD', hp: 5, rotSpeed: 0.015, scoreValue: 300, hitRadius: 3.5 };
+      }
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * 8;
+      const spawnX = Math.cos(angle) * radius;
+      const spawnY = Math.sin(angle) * radius;
+      const spawnZ = -160 - Math.random() * 40;
+      enemy.position.set(spawnX, spawnY, spawnZ);
+      const line = createPredictionLine(spawnX, spawnY, spawnZ);
+      enemy.userData.warningLine = line;
+      scene.add(enemy);
+      enemies.push(enemy);
+    }
+    
+    // --- ボス生成 ---
+    function spawnBoss() {
+      if (isBossActive || gameState !== 'PLAYING') return;
+      isBossActive = true;
+      maxBossHp = 120 + Math.floor(score / 1500) * 40;
+      bossHp = maxBossHp;
+      const bossGroup = new THREE.Group();
+      // ボスコア
+      const coreGeo = new THREE.IcosahedronGeometry(3.6, 2);
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: 0xff0033,
+        emissive: 0xaa0022,
+        roughness: 0.2,
+        metalness: 0.8
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      bossGroup.add(core);
+      // 回転リング
+      const ringGeo = new THREE.TorusGeometry(6.2, 0.45, 16, 32);
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: 0x00f0ff,
+        emissive: 0x0055aa,
+        roughness: 0.1,
+        metalness: 0.9,
+        wireframe: true
+      });
+      const ring1 = new THREE.Mesh(ringGeo, ringMat);
+      ring1.name = "ring1";
+      bossGroup.add(ring1);
+      const ring2 = new THREE.Mesh(ringGeo, ringMat);
+      ring2.scale.set(1.3, 1.3, 1.3);
+      ring2.rotation.x = Math.PI / 2;
+      ring2.name = "ring2";
+      bossGroup.add(ring2);
+      // ウイング
+      const wingGeo = new THREE.ConeGeometry(1.4, 6, 4);
+      wingGeo.rotateX(Math.PI / 2);
+      const wingMat = new THREE.MeshStandardMaterial({ color: 0x222244, metalness: 0.9 });
+      
+      [-1, 1].forEach(dir => {
+        const wing = new THREE.Mesh(wingGeo, wingMat);
+        wing.position.set(dir * 7, 0, 0);
+        wing.rotation.z = dir * -Math.PI / 4;
+        bossGroup.add(wing);
+      });
+      bossGroup.position.set(0, 0, -150);
+      bossGroup.userData = { isWarning: false, warningLines: [], targetDirs: [] };
+      scene.add(bossGroup);
+      boss = bossGroup;
+      document.getElementById('boss-hud').classList.remove('hidden');
+      updateBossHUD();
+    }
+    
+    // --- ボス攻撃 ---
+    function bossShoot(dirs) {
+      if (!boss || !player.visible) return;
+      sound.playLaser();
+      const bGeo = new THREE.SphereGeometry(0.55, 8, 8);
+      const bMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+      dirs.forEach(dir => {
+        const bullet = new THREE.Mesh(bGeo, bMat);
+        bullet.position.copy(boss.position);
+        bullet.userData = {
+          velocity: dir.clone().multiplyScalar(1.2)
+        };
+        scene.add(bullet);
+        bossBullets.push(bullet);
+      });
+    }
+    
+    // --- ボスHPバー更新 ---
+    function updateBossHUD() {
+      const bossBar = document.getElementById('boss-bar');
+      if (bossBar) {
+        const pct = Math.max(0, (bossHp / maxBossHp) * 100);
+        bossBar.style.width = `${pct}%`;
+      }
+    }
+
+    // --- リロード処理 ---
+    function startReload() {
+      if (isReloading || currentAmmo === maxAmmo) return;
+      isReloading = true;
+      reloadTimer = 0;
+      sound.playReload();
+    }
+    
+    // --- ショット発射処理 ---
+    function shoot() {
+      if (gameState !== 'PLAYING' || !player.visible) return;
+      if (isReloading) return;
+      if (currentAmmo <= 0) {
+        startReload();
+        return;
+      }
+      sound.playLaser();
+      currentAmmo--;
+      const laserGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.4, 8);
+      laserGeo.rotateX(Math.PI / 2);
+      const skin = SKINS[currentSkin] || SKINS['DEFAULT'];
+      const laserMat = new THREE.MeshBasicMaterial({ color: skin.color }); // スキンに合わせてレーザー色変更
+      [-0.85, 0.85].forEach(offsetX => {
+        const bullet = new THREE.Mesh(laserGeo, laserMat);
+        bullet.position.set(player.position.x + offsetX, player.position.y, player.position.z - 0.5);
+        scene.add(bullet);
+        bullets.push(bullet);
+      });
+      if (currentAmmo <= 0) {
+        startReload();
+      }
+    }
+    
+    // --- 爆発エフェクト ---
+    function createExplosion(pos, color = 0xff0066, scale = 1.0) {
+      sound.playExplosion(scale > 1.2);
+      cameraShake = Math.max(cameraShake, 0.3 * scale);
+      const group = new THREE.Group();
+      group.position.copy(pos);
+      const flashGeo = new THREE.SphereGeometry(0.85 * scale, 16, 16);
+      const flashMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1.0 });
+      const flash = new THREE.Mesh(flashGeo, flashMat);
+      group.add(flash);
+      const ringGeo = new THREE.RingGeometry(0.2 * scale, 0.7 * scale, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.random() * Math.PI;
+      ring.rotation.y = Math.random() * Math.PI;
+      group.add(ring);
+      const count = Math.floor(45 * scale);
+      const pGeo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      const velocities = [];
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = 0;
+        positions[i * 3 + 1] = 0;
+        positions[i * 3 + 2] = 0;
+        const speed = (0.6 + Math.random() * 1.6) * scale;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.random() * Math.PI - Math.PI / 2;
+        velocities.push({
+          x: Math.cos(phi) * Math.cos(theta) * speed,
+          y: Math.cos(phi) * Math.sin(theta) * speed,
+          z: Math.sin(phi) * speed
+        });
+      }
+      pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const pMat = new THREE.PointsMaterial({
+        color: color,
+        size: 0.6 * scale,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending
+      });
+      const pSystem = new THREE.Points(pGeo, pMat);
+      group.add(pSystem);
+      scene.add(group);
+      explosions.push({
+        group: group,
+        flash: flash,
+        ring: ring,
+        pSystem: pSystem,
+        velocities: velocities,
+        life: 1.0,
+        decay: 0.032 / scale
+      });
+    }
+
+    // --- 操作処理 ---
+    function handleKey(e, isDown) {
+      const key = e.key.toLowerCase();
+      if (key === 'w' || key === 'arrowup') keys.w = isDown;
+      if (key === 'a' || key === 'arrowleft') keys.a = isDown;
+      if (key === 's' || key === 'arrowdown') keys.s = isDown;
+      if (key === 'd' || key === 'arrowright') keys.d = isDown;
+      if (key === ' ' || key === 'space') {
+        keys.space = isDown;
+      }
+      if (key === 'shift') keys.shift = isDown;
+      if (key === 'r') {
+        if (isDown && !keys.r) startReload();
+        keys.r = isDown;
+      }
+    }
+    function onMouseMove(e) {
+      mousePos.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mousePos.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    }
+    function onMouseDown(e) {
+      if (e.button === 0) {
+        isMouseDown = true;
+      }
+    }
+    function onMouseUp(e) {
+      if (e.button === 0) {
+        isMouseDown = false;
+      }
+    }
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    // --- クロスヘア（照準）の更新 ---
+    function updateCrosshair() {
+      if (!crosshairElement || !player || !player.visible) return;
+      const targetVec = new THREE.Vector3(player.position.x, player.position.y, player.position.z - 20);
+      targetVec.project(camera);
+      const x = (targetVec.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-(targetVec.y * 0.5) + 0.5) * window.innerHeight;
+      crosshairElement.style.left = `${x}px`;
+      crosshairElement.style.top = `${y}px`;
+    }
+    
+    // --- ゲーム開始/リセット ---
+    function startGame() {
+      sound.init();
+      gameState = 'PLAYING';
+      
+      const skinStats = (SKINS[currentSkin] || SKINS['DEFAULT']).stats;
+      maxShield = skinStats.shield;
+      baseSpeed = skinStats.speed;
+      shootInterval = skinStats.fireRate;
+      maxAmmo = skinStats.ammo;
+      maxBoost = skinStats.boost;
+      currentBulletSpeed = skinStats.bulletSpeed || 4.0;
+      
+      score = 0;
+      shield = maxShield;
+      boostAmount = maxBoost;
+      canBoost = true;
+      currentAmmo = maxAmmo;
+      currentSpeed = baseSpeed;
+      
+      isReloading = false;
+      reloadTimer = 0;
+      lastShootTime = 0;
+      cameraShake = 0;
+      isTouchFiring = false;
+      const fireBtn = document.getElementById('touch-fire-btn');
+      if (fireBtn) fireBtn.classList.remove('active');
+      enemies.forEach(e => {
+        if (e.userData.warningLine) scene.remove(e.userData.warningLine);
+        scene.remove(e);
+      });
+      bullets.forEach(b => scene.remove(b));
+      explosions.forEach(exp => scene.remove(exp.group));
+      if (boss) {
+        if (boss.userData && boss.userData.warningLines) {
+          boss.userData.warningLines.forEach(line => scene.remove(line));
+        }
+        scene.remove(boss);
+        boss = null;
+      }
+      bossBullets.forEach(bb => scene.remove(bb));
+      bossBullets = [];
+      isBossActive = false;
+      nextBossScore = 1500;
+      document.getElementById('boss-hud').classList.add('hidden');
+      enemies = [];
+      bullets = [];
+      explosions = [];
+      player.visible = true;
+      player.position.set(0, 0, 0);
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+      if (crosshairElement) crosshairElement.style.opacity = '1';
+      updateHUD();
+    }
+    
+    function gameOver() {
+      gameState = 'GAMEOVER';
+      player.visible = false;
+      isTouchFiring = false;
+      createExplosion(player.position, 0x00f0ff, 2.5);
+      setTimeout(() => createExplosion(new THREE.Vector3(player.position.x + 0.5, player.position.y + 0.5, player.position.z - 0.5), 0xff0066, 2.0), 100);
+      setTimeout(() => createExplosion(new THREE.Vector3(player.position.x - 0.5, player.position.y - 0.5, player.position.z + 0.5), 0xffaa00, 2.2), 200);
+      if (crosshairElement) crosshairElement.style.opacity = '0';
+      
+      // コイン計算処理
+      const earned = Math.floor(score / 10);
+      totalCoins += earned;
+      saveData();
+      
+      setTimeout(() => {
+        document.getElementById('final-score').innerText = `FINAL SCORE: ${Math.floor(score)}`;
+        document.getElementById('earned-coins').innerText = `EARNED COINS: +${earned}`;
+        document.getElementById('gameover-screen').classList.remove('hidden');
+      }, 1000);
+    }
+    
+    // --- HUD更新 ---
+    function updateHUD() {
+      document.getElementById('score-text').innerText = Math.floor(score).toString().padStart(6, '0');
+      document.getElementById('speed-text').innerText = `${Math.floor(currentSpeed * 120)} KM/H`;
+      document.getElementById('shield-bar').style.width = `${Math.max(0, (shield / maxShield) * 100)}%`;
+      
+      const boostBar = document.getElementById('boost-bar');
+      const boostLabel = document.getElementById('boost-label');
+      
+      const boostPct = (boostAmount / maxBoost) * 100;
+      boostBar.style.width = `${Math.max(0, boostPct)}%`;
+      if (!canBoost) {
+        boostLabel.innerText = "OVERHEAT!";
+        boostLabel.classList.add("overheat-text");
+        boostBar.classList.add("overheat-bar");
+      } else {
+        boostLabel.innerText = "BOOST [SHIFT]";
+        boostLabel.classList.remove("overheat-text");
+        boostBar.classList.remove("overheat-bar");
+      }
+      
+      const ammoBar = document.getElementById('ammo-bar');
+      const ammoLabel = document.getElementById('ammo-label');
+      const ammoText = document.getElementById('ammo-text');
+      if (isReloading) {
+        const reloadPct = (reloadTimer / RELOAD_TIME) * 100;
+        ammoBar.style.width = `${reloadPct}%`;
+        ammoBar.classList.add("reload-bar");
+        ammoLabel.classList.add("reload-text");
+        ammoText.innerText = "RELOADING...";
+      } else {
+        const ammoPct = (currentAmmo / maxAmmo) * 100;
+        ammoBar.style.width = `${ammoPct}%`;
+        ammoBar.classList.remove("reload-bar");
+        ammoLabel.classList.remove("reload-text");
+        ammoText.innerText = `${currentAmmo} / ${maxAmmo}`;
+      }
+    }
+
+    // --- メインアップデートループ ---
+    let enemySpawnTimer = 0;
+    let clock = new THREE.Clock();
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const now = clock.getElapsedTime();
+      
+      if (cameraShake > 0) {
+        camera.position.x += (Math.random() - 0.5) * cameraShake;
+        camera.position.y += (Math.random() - 0.5) * cameraShake;
+        cameraShake *= 0.88;
+        if (cameraShake < 0.01) cameraShake = 0;
+      }
+      
+      if (gameState === 'PLAYING') {
+        // リロード処理
+        if (isReloading) {
+          reloadTimer += delta;
+          if (reloadTimer >= RELOAD_TIME) {
+            currentAmmo = maxAmmo;
+            isReloading = false;
+            reloadTimer = 0;
+          }
+        }
+        
+        // 自動連射処理（マウス長押し / Space長押し / タッチFIREボタン長押し）
+        if ((isMouseDown || keys.space || isTouchFiring) && !isReloading) {
+          if (now - lastShootTime >= shootInterval) {
+            shoot();
+            lastShootTime = now;
+          }
+        }
+        
+        // スピード & スタミナ計算
+        if (boostAmount <= 0) {
+          boostAmount = 0;
+          canBoost = false;
+        } else if (!canBoost && boostAmount >= maxBoost) {
+          // 全回復（100% / maxBoost）するまでブースト解禁しない
+          canBoost = true;
+        }
+        isBoosting = keys.shift && canBoost && boostAmount > 0;
+        if (isBoosting) {
+          currentSpeed = THREE.MathUtils.lerp(currentSpeed, baseSpeed * 2.2, 0.1);
+          boostAmount -= 0.8;
+          targetFov = 95;
+        } else {
+          currentSpeed = THREE.MathUtils.lerp(currentSpeed, baseSpeed, 0.05);
+          if (boostAmount < maxBoost) boostAmount += 0.5;
+          targetFov = 75;
+        }
+        score += currentSpeed * 0.5;
+        if (Math.abs(camera.fov - targetFov) > 0.1) {
+          camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.05);
+          camera.updateProjectionMatrix();
+        }
+        
+        // プレイヤー位置制御（キーボード・マウス・タッチスライド対応）
+        if (player.visible) {
+          let moveX = 0, moveY = 0;
+          // キーボード入力
+          if (keys.a) moveX -= 1;
+          if (keys.d) moveX += 1;
+          if (keys.w) moveY += 1;
+          if (keys.s) moveY -= 1;
+          
+          if (moveX !== 0 || moveY !== 0) {
+            playerTargetPos.x += moveX * 0.3;
+            playerTargetPos.y += moveY * 0.3;
+          } else {
+            // マウスまたはタッチスライド位置追従
+            playerTargetPos.x = mousePos.x * 10;
+            playerTargetPos.y = mousePos.y * 6;
+          }
+          playerTargetPos.x = THREE.MathUtils.clamp(playerTargetPos.x, -9, 9);
+          playerTargetPos.y = THREE.MathUtils.clamp(playerTargetPos.y, -5.5, 5.5);
+          
+          player.position.x = THREE.MathUtils.lerp(player.position.x, playerTargetPos.x, 0.1);
+          player.position.y = THREE.MathUtils.lerp(player.position.y, playerTargetPos.y, 0.1);
+          const rollAngle = (player.position.x - playerTargetPos.x) * 0.15;
+          const pitchAngle = (playerTargetPos.y - player.position.y) * 0.1;
+          player.rotation.z = THREE.MathUtils.lerp(player.rotation.z, rollAngle, 0.1);
+          player.rotation.x = THREE.MathUtils.lerp(player.rotation.x, pitchAngle, 0.1);
+          camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x * 0.3, 0.05);
+          camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y * 0.3, 0.05);
+          camera.rotation.z = player.rotation.z * 0.2;
+          
+          updateCrosshair();
+          
+          const glow = player.getObjectByName("engineGlow");
+          if (glow) {
+            glow.scale.setScalar(isBoosting ? 1.8 + Math.random() * 0.4 : 1.0 + Math.random() * 0.2);
+          }
+        }
+        
+        // 背景・トンネル移動
+        const posAttr = starGeo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          let z = posAttr.getZ(i);
+          z += currentSpeed * 2.0;
+          if (z > 5) z = -200;
+          posAttr.setZ(i, z);
+        }
+        posAttr.needsUpdate = true;
+        
+        tunnelRings.forEach(ring => {
+          ring.position.z += currentSpeed * 1.2;
+          ring.rotation.z += 0.01;
+          if (ring.position.z > 5) {
+            ring.position.z = -200;
+          }
+        });
+        
+        // 敵の生成と移動
+        enemySpawnTimer++;
+        if (!isBossActive && enemySpawnTimer > Math.max(35, 90 - Math.floor(score / 500))) {
+          spawnEnemy();
+          enemySpawnTimer = 0;
+        }
+        
+        // ボス出現トリガー
+        if (!isBossActive && score >= nextBossScore) {
+          spawnBoss();
+        }
+        
+        // ボス本体の動作 & 当たり判定
+        if (isBossActive && boss) {
+          if (boss.position.z < -38) {
+            boss.position.z += 0.8;
+          } else {
+            boss.position.x = Math.sin(now * 1.5) * 6;
+            boss.position.y = Math.cos(now * 1.2) * 3;
+          }
+          const r1 = boss.getObjectByName("ring1");
+          const r2 = boss.getObjectByName("ring2");
+          if (r1) r1.rotation.z += 0.035;
+          if (r2) r2.rotation.y += 0.045;
+          bossShootTimer += delta;
+
+          if (bossShootTimer > 0.8 && !boss.userData.isWarning) {
+            boss.userData.isWarning = true;
+            boss.userData.warningLines = [];
+            boss.userData.targetDirs = [];
+            
+            const baseDir = new THREE.Vector3().subVectors(player.position, boss.position).normalize();
+            for (let i = -1; i <= 1; i++) {
+              const dir = baseDir.clone().add(new THREE.Vector3(i * 0.12, (Math.random() - 0.5) * 0.1, 0)).normalize();
+              boss.userData.targetDirs.push(dir);
+              
+              const distance = 200; 
+              const geo = new THREE.CylinderGeometry(0.15, 0.15, distance, 8);
+              geo.rotateX(Math.PI / 2);
+              const mat = new THREE.MeshBasicMaterial({
+                color: 0xff0055,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+              });
+              const line = new THREE.Mesh(geo, mat);
+              line.position.copy(boss.position);
+              
+              const targetPos = boss.position.clone().add(dir.clone().multiplyScalar(distance));
+              line.lookAt(targetPos);
+              line.translateZ(distance / 2);
+              
+              scene.add(line);
+              boss.userData.warningLines.push(line);
+            }
+          }
+          
+          if (boss.userData.isWarning && boss.userData.warningLines) {
+            boss.userData.warningLines.forEach(line => {
+              line.material.opacity = 0.2 + Math.sin(Date.now() * 0.02) * 0.3;
+              line.scale.x = 1.0 + Math.sin(Date.now() * 0.04) * 0.6;
+              line.scale.y = 1.0 + Math.sin(Date.now() * 0.04) * 0.6;
+            });
+          }
+
+          if (bossShootTimer > 1.4) {
+            if (boss.userData.warningLines) {
+              boss.userData.warningLines.forEach(line => scene.remove(line));
+              boss.userData.warningLines = [];
+            }
+            bossShoot(boss.userData.targetDirs);
+            boss.userData.isWarning = false;
+            bossShootTimer = 0;
+          }
+          
+          // 自機弾 vs ボス
+          for (let i = bullets.length - 1; i >= 0; i--) {
+            const bullet = bullets[i];
+            if (bullet.position.distanceTo(boss.position) < 5.2) {
+              sound.playHit();
+              createExplosion(bullet.position, 0xff0055, 0.6);
+              bossHp -= 2;
+              updateBossHUD();
+              scene.remove(bullet);
+              bullets.splice(i, 1);
+              if (bossHp <= 0) {
+                // ボス撃破エフェクト
+                const deathPos = boss.position.clone();
+                createExplosion(deathPos, 0xff0055, 3.5);
+                setTimeout(() => createExplosion(deathPos, 0x00f0ff, 3.0), 120);
+                setTimeout(() => createExplosion(deathPos, 0xffaa00, 3.2), 240);
+                score += 3500;
+                nextBossScore = score + 2500;
+                if (boss.userData && boss.userData.warningLines) {
+                  boss.userData.warningLines.forEach(line => scene.remove(line));
+                }
+                scene.remove(boss);
+                boss = null;
+                isBossActive = false;
+                document.getElementById('boss-hud').classList.add('hidden');
+                break;
+              }
+            }
+          }
+          // 自機 vs ボス直撃
+          if (boss && player.visible) {
+            if (boss.position.distanceTo(player.position) < 3.8) {
+              sound.playHit();
+              shield -= 45;
+              createExplosion(player.position, 0xff0055, 1.5);
+              if (shield <= 0) gameOver();
+            }
+          }
+        }
+        
+        // ボス弾移動 & 当たり判定
+        for (let i = bossBullets.length - 1; i >= 0; i--) {
+          const bb = bossBullets[i];
+          bb.position.add(bb.userData.velocity);
+          if (player.visible && bb.position.distanceTo(player.position) < 0.8) {
+            sound.playHit();
+            createExplosion(bb.position, 0xff0055, 0.9);
+            shield -= 15;
+            scene.remove(bb);
+            bossBullets.splice(i, 1);
+            if (shield <= 0) gameOver();
+            continue;
+          }
+          if (bb.position.z > 20 || bb.position.z < -200) {
+            scene.remove(bb);
+            bossBullets.splice(i, 1);
+          }
+        }
+        
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const enemy = enemies[i];
+          enemy.position.z += currentSpeed;
+          enemy.rotation.x += enemy.userData.rotSpeed;
+          enemy.rotation.y += enemy.userData.rotSpeed;
+          
+          if (enemy.userData.warningLine) {
+            const line = enemy.userData.warningLine;
+            if (enemy.position.z > -20) {
+              line.material.opacity *= 0.85;
+              if (line.material.opacity < 0.05) {
+                scene.remove(line);
+                enemy.userData.warningLine = null;
+              }
+            } else {
+              // 警告レーザーの点滅と太さの脈動アニメーション
+              line.material.opacity = 0.3 + Math.sin(Date.now() * 0.015) * 0.3;
+              line.scale.x = 1.0 + Math.sin(Date.now() * 0.03) * 0.8;
+              line.scale.y = 1.0 + Math.sin(Date.now() * 0.03) * 0.8;
+            }
+          }
+          
+          if (player.visible) {
+            const distToPlayer = enemy.position.distanceTo(player.position);
+            if (distToPlayer < 1.8) {
+              sound.playHit();
+              createExplosion(enemy.position, 0xffaa00, 1.2);
+              if (enemy.userData.warningLine) scene.remove(enemy.userData.warningLine);
+              scene.remove(enemy);
+              enemies.splice(i, 1);
+              shield -= 25;
+              if (shield <= 0) {
+                gameOver();
+              }
+              continue;
+            }
+          }
+          
+          if (enemy.position.z > 10) {
+            if (enemy.userData.warningLine) scene.remove(enemy.userData.warningLine);
+            scene.remove(enemy);
+            enemies.splice(i, 1);
+          }
+        }
+        
+        // 弾丸移動 & 命中判定
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const bullet = bullets[i];
+          bullet.position.z -= currentBulletSpeed;
+          let bulletHit = false;
+          
+          for (let j = enemies.length - 1; j >= 0; j--) {
+            const enemy = enemies[j];
+            const dist = bullet.position.distanceTo(enemy.position);
+            const targetHitRadius = enemy.userData.hitRadius || 2.8;
+            
+            if (dist < targetHitRadius) {
+              sound.playHit();
+              createExplosion(bullet.position, 0x00ffff, 0.5);
+              enemy.userData.hp -= 1;
+              if (enemy.userData.hp <= 0) {
+                const isHard = enemy.userData.type === 'HARD';
+                createExplosion(enemy.position, isHard ? 0xffaa00 : 0xff0066, isHard ? 1.8 : 1.2);
+                score += enemy.userData.scoreValue;
+                if (enemy.userData.warningLine) scene.remove(enemy.userData.warningLine);
+                scene.remove(enemy);
+                enemies.splice(j, 1);
+              }
+              bulletHit = true;
+              break;
+            }
+          }
+          if (bulletHit || bullet.position.z < -200) {
+            scene.remove(bullet);
+            bullets.splice(i, 1);
+          }
+        }
+        updateHUD();
+      } else {
+        stars.rotation.z += 0.001;
+      }
+      
+      // 爆発アニメーションの更新
+      for (let i = explosions.length - 1; i >= 0; i--) {
+        const exp = explosions[i];
+        exp.life -= exp.decay;
+        exp.flash.scale.addScalar(0.15);
+        exp.flash.material.opacity = exp.life * 1.5;
+        exp.ring.scale.addScalar(0.25);
+        exp.ring.material.opacity = exp.life;
+        const posArray = exp.pSystem.geometry.attributes.position.array;
+        for (let j = 0; j < exp.velocities.length; j++) {
+          posArray[j * 3] += exp.velocities[j].x;
+          posArray[j * 3 + 1] += exp.velocities[j].y;
+          posArray[j * 3 + 2] += exp.velocities[j].z;
+        }
+        exp.pSystem.geometry.attributes.position.needsUpdate = true;
+        exp.pSystem.material.opacity = exp.life;
+        if (exp.life <= 0) {
+          scene.remove(exp.group);
+          explosions.splice(i, 1);
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    
+    // ロード完了時に開始
+    window.onload = init;
+  </script>
+</body>
+</html>
